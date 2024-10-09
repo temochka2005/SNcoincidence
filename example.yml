@@ -1,0 +1,20 @@
+config:
+    - &server_address "ipc://server.ipc" 
+node: !Node
+  - !chain
+    - !from sn_combine.generator: {}
+    - .timing.every: {seconds: 0.1}
+    - .tqdm.counter: {desc: 'generated:'}
+    - .io.zmq.send: {address: *server_address}
+
+
+node_server: !Node
+  - !chain
+    - !from .io.zmq.recv: {address: *server_address}
+    - sn_combine.buffer: {size: 100}
+    - .tqdm.counter: {desc: 'buffered:'}
+    #- .output.dump: {prefix: "received:"}
+#    - sn_combine.plot_hist
+    - sn_combine.plot_box: {}
+    
+    
