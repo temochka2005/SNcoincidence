@@ -2,10 +2,10 @@ import numpy as np
 import datetime
 import plotext as plt
 
-async def generator(userID: str):
+async def generator(userID: str, shift = 0.0):
     while(True):
         t = datetime.datetime.now()
-        z = np.random.normal(loc=0.0, scale=1.0, size=None)
+        z = np.random.normal(loc=float(shift), scale=1.0, size=None)
         yield {"t":t, "z":z, "userID":userID}
 
 
@@ -13,47 +13,55 @@ class ClientBuffer:
     def __init__(self):
         self.clear()
 
-    def append(self, z, t):
-        self.z.append(z)
-        self.t.append(t)
+    def put(self, z, t):
+        self.z = np.append(self.z, z)
+        self.t = np.append(self.t, t)
 
     def clear(self):
-        self.z = np.array()
-        self.t = np.array()
+        self.z = np.array([])
+        self.t = np.array([])
 
     def len(self):
-        return(len(z))
+        return(len(self.z))
+
+    def get(self):
+        if len(self.z) != 0:
+            return self.z, self.t[0], self.t[-1]
+        else: 
+            pass
 
 class Buffer:
     def __init__(self):
         self.clear()
 
-    def append(self, z, t, userID):
-        buf = self.clients.setdefault(userID, default = ClientBuffer())
-        buf.append(z, t)
+    async def put(self, data):
+        buf = self.clients.setdefault(data["userID"], ClientBuffer())
+        buf.put(data["z"], data["t"])
 
     def clear(self):
         self.clients = dict()
 
-    def get(self):
-        pass 
+    async def get(self):
+        result = dict()
+        for userID in self.clients:
+            result[userID] = self.clients[userID].get()
+            self.clients[userID].clear()
+        return result
+            
+            
+
+
 
     
 def buffer(size=100):
     async def _buffer(source):
-        buffer = Buffer()
-        data = []
-        time = []
-        cnt = 0
-        async for t,z in source:
-            data.append(z)
-            time.append(t)
-            cnt += 1
-            if cnt == size:
-                yield np.asarray(data), time[0], time[-1]
-                data = []
-                time = []
-                cnt = 0
+        buffer = ClientBuffer()
+        async for data in source:
+            buffer.put(z = data['z'], t = data['t'])
+            if buffer.len() == size:
+                yield buffer.get()
+                buffer.clear()
+                
     return _buffer
 
 def plot_hist(data: list):
@@ -64,17 +72,21 @@ def plot_hist(data: list):
 
 def plot_box():
     async def _plot_box(source):
-        zs = []
-        ts = []
+        zs = dict()
+        ts = dict()
+        
         async for data in source:
-            z,t0,t1 = data #unpack data
-            
-            zs.append(z)
-            ts.append( datetime.datetime.fromtimestamp((t1.timestamp() + t0.timestamp()) / 2 ) )
+            for userID in data:
+                client_data = data[userID]
+                if client_data:
+                    z,t0,t1 = data[userID] #unpack data
+                    zs.setdefault(userID, []).append(z)
+                    ts.setdefault(userID, []).append( datetime.datetime.fromtimestamp((t1.timestamp() + t0.timestamp()) / 2 ) )
             # plotting
             plt.cld()
             plt.clf()
-            plt.box(plt.datetimes_to_strings(ts, 'x X'), zs)
+            for userID in zs:
+                plt.box(plt.datetimes_to_strings(ts[userID], 'x X'), zs[userID])
             plt.show()
             yield None
     return _plot_box
