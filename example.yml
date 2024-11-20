@@ -13,11 +13,9 @@ node_server: !Node
     - !from .io.zmq.recv: {address: *server_address}
     # - .output.dump: {prefix: "received:"}
     # - sn_combine.buffer: {size: 100}
-    - sn_combine.Buffer: {}
+    - server_graphics.DashBoard: {}
     - .timing.every: {seconds: 5}
     - .tqdm.counter: {desc: 'buffered:'}
     # - .output.dump: {}
-    # - sn_combine.plot_hist
-    - sn_combine.plot_box: {}
     
     
