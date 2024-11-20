@@ -32,10 +32,12 @@ def data_generator():
 generator = data_generator()
 
 
+
+
+
+
 class DashBoard:
     def __init__(self):
-        self.zs_data = {}
-        self.ts_data = {}
         # Инициализация Dash-приложения
         self.app = dash.Dash(__name__)
         self.make_layout()
