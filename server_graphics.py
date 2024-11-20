@@ -1,47 +1,23 @@
 import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
+from dash import dcc, html, no_update
+from dash.dependencies import Input, Output
 import plotly.graph_objs as go
 import numpy as np
-
-def user_generator(mean_value = 0, probability = 1):
-    t = 0
-    while True:
-        if probability > np.random.rand():
-            zs = np.random.normal(loc=mean_value, scale=1.0, size=100)
-            t += 1
-            yield zs, t * np.ones_like(zs)
-        else: 
-            yield None
+from sn_combine import Buffer
+from threading import Thread
+import plotly.express as px
 
 
-# Генератор данных
-def data_generator():
-    users = {
-            "user1": user_generator(mean_value=0.0),
-            "user2": user_generator(mean_value=5.0, probability = 0.5),
-            "user3": user_generator(mean_value=10.0, probability = 0.7),
-        }
-    for data_tuple in zip(*users.values()):
-        data = {user : values for user, values in zip(users, data_tuple) if values is not None}
-        yield data
-
-
-
-# Создание генератора данных
-generator = data_generator()
-
-
-
-
-
-
-class DashBoard:
+class DashBoard(Buffer):
     def __init__(self):
+        super().__init__()
         # Инициализация Dash-приложения
         self.app = dash.Dash(__name__)
         self.make_layout()
         self.define_callbacks()
+        t = Thread(target=self.app.run_server,
+                    kwargs={"debug" : True, "use_reloader" :False})
+        t.start()
 
     
     def make_layout(self):
@@ -61,7 +37,7 @@ class DashBoard:
 
             html.Div([
                 dcc.Graph(id='box-plots'),  # Один график для всех "ящиков с усами"
-                dcc.Interval(id='interval-component', interval=5000, n_intervals=0)  # Обновление каждые 1 сек
+                dcc.Interval(id='interval-component', interval=500, n_intervals=0)  # Обновление каждые 1 сек
             ]),
 
             html.Div([
@@ -80,8 +56,8 @@ class DashBoard:
 
         self.app.callback(
             Output('data-store', 'data'),
-            [State('data-store', 'data')],
-            [Input('data_update_button', 'n_clicks')]            
+            [Input('data_update_button', 'n_clicks'),
+            Input('interval-component', 'n_intervals')]     
         )(self.update_data)
 
         @self.app.callback(
@@ -90,27 +66,20 @@ class DashBoard:
         )
         def update_graph(data):
             # self.update_data()
-
-            color_list = {
-                "user1": "red",
-                "user2": "green",
-                "user3": "blue"
-            }
+            if data == {}:
+                return no_update
             
             # Список для хранения "ящиков с усами" для каждого userID
             box_plots = []
-            print(data)
-            for userID in data["z"]:
-                zs = data["z"][userID]
-                ts = data["t"][userID]
-                zs = np.concatenate(zs)
-                ts = np.concatenate(ts)
-                box_plots.append(go.Box(
+            
+            for userID in data:
+                zs, ts = data[userID]
+                box_plots.append(go.Scatter(
                     y=zs,
                     x=ts,  
                     name=f'User {userID}',
-                    boxpoints=False,
-                    marker_color=color_list[userID]
+                    # boxpoints=False,
+                    # marker_color=color_list[userID]
                 ))
 
             # Создание фигуры с несколькими ящиками
@@ -126,19 +95,8 @@ class DashBoard:
 
             return fig
         
-    def update_data(self, current_data, *args):
-       
-        data = current_data or {"z": {}, "t": {}}
-        new_data:dict = next(generator)
-
-        for userID, values in new_data.items():
-            zs, ts = values
-            data["z"].setdefault(userID, [])
-            data["z"][userID].append(zs)
-            data["t"].setdefault(userID, [])
-            data["t"][userID].append(ts)
-
-        return data
+    def update_data(self, *args):      
+        return self.get_data()
 
 
 
@@ -147,7 +105,3 @@ class DashBoard:
 
 
 
-dashboard = DashBoard()
-# Запуск приложения
-if __name__ == '__main__':
-    dashboard.app.run_server(debug=True)
