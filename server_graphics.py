@@ -1,14 +1,8 @@
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 import numpy as np
-
-
-
-
-# Предопределенные временные метки, для которых user3 никогда не будет получать данные
-missing_ts_for_user3 = {2, 4, 6}  # Например, никогда не будет данных для t = 2, 4, 6
 
 def user_generator(mean_value = 0, probability = 1):
     t = 0
@@ -38,68 +32,120 @@ def data_generator():
 generator = data_generator()
 
 
-# Инициализация Dash-приложения
-app = dash.Dash(__name__)
+class DashBoard:
+    def __init__(self):
+        self.zs_data = {}
+        self.ts_data = {}
+        # Инициализация Dash-приложения
+        self.app = dash.Dash(__name__)
+        self.make_layout()
+        self.define_callbacks()
 
-# Макет приложения
-app.layout = html.Div([
-    dcc.Graph(id='box-plots'),  # Один график для всех "ящиков с усами"
-    dcc.Interval(id='interval-component', interval=1000, n_intervals=0)  # Обновление каждые 1 сек
-])
-
-zs_data = {}
-ts_data = {}
-
-# Функция для обновления графиков
-@app.callback(
-    Output('box-plots', 'figure'),
-    [Input('interval-component', 'n_intervals')]
-)
-def update_graph(n):
-    # Получение новых данных из генератора
-    data:dict = next(generator)
     
-    # Обработка данных для каждого пользователя
-    for userID, values in data.items():
-            zs_data.setdefault(userID, [])
-            ts_data.setdefault(userID, [])
+    def make_layout(self):
+        """
+        Макет приложения
+        """
+        self.app.layout = html.Div(children=[
+            # All elements from the top of the page
+            dcc.Store(id='data-store', storage_type='session'),
+            html.Div([
+                html.H1(children='Server_graphics SNcoincidence test'),
+
+                html.Div(children='''
+                    Dash: A web application framework for Python.
+                '''),  
+            ]),
+
+            html.Div([
+                dcc.Graph(id='box-plots'),  # Один график для всех "ящиков с усами"
+                dcc.Interval(id='interval-component', interval=5000, n_intervals=0)  # Обновление каждые 1 сек
+            ]),
+
+            html.Div([
+                html.Button(id='data_update_button', n_clicks=0, children='Update')
+            ])
+
+        ])
+        
+    
+    def define_callbacks(self):
+        """
+        Функция для обновления графиков
+        """
+        
+
+
+        self.app.callback(
+            Output('data-store', 'data'),
+            [State('data-store', 'data')],
+            [Input('data_update_button', 'n_clicks')]            
+        )(self.update_data)
+
+        @self.app.callback(
+            Output('box-plots', 'figure'),
+            Input('data-store', 'data'),
+        )
+        def update_graph(data):
+            # self.update_data()
+
+            color_list = {
+                "user1": "red",
+                "user2": "green",
+                "user3": "blue"
+            }
+            
+            # Список для хранения "ящиков с усами" для каждого userID
+            box_plots = []
+            print(data)
+            for userID in data["z"]:
+                zs = data["z"][userID]
+                ts = data["t"][userID]
+                zs = np.concatenate(zs)
+                ts = np.concatenate(ts)
+                box_plots.append(go.Box(
+                    y=zs,
+                    x=ts,  
+                    name=f'User {userID}',
+                    boxpoints=False,
+                    marker_color=color_list[userID]
+                ))
+
+            # Создание фигуры с несколькими ящиками
+            fig = go.Figure(data=box_plots)
+
+
+            # Настройка осей и заголовков
+            fig.update_layout(
+                title='Обновляющиеся ящики с усами для каждого userID',
+                xaxis_title='Time (ts)',
+                yaxis_title='Values (zs)',
+            )
+
+            return fig
+        
+    def update_data(self, current_data, *args):
+       
+        data = current_data or {"z": {}, "t": {}}
+        new_data:dict = next(generator)
+
+        for userID, values in new_data.items():
             zs, ts = values
-            zs_data[userID].append(zs)
-            ts_data[userID].append(ts)
+            data["z"].setdefault(userID, [])
+            data["z"][userID].append(zs)
+            data["t"].setdefault(userID, [])
+            data["t"][userID].append(ts)
 
-    color_list = {
-        "user1": "red",
-        "user2": "green",
-        "user3": "blue"
-    }
-    
-    # Список для хранения "ящиков с усами" для каждого userID
-    box_plots = []
-    
-    for userID in zs_data:
-        zs = zs_data[userID]
-        ts = ts_data[userID]
-        zs = np.concatenate(zs)
-        ts = np.concatenate(ts)
-        box_plots.append(go.Box(
-            y=zs,
-            x=ts,  
-            name=f'User {userID}',
-            boxpoints=False,
-            marker_color=color_list[userID]
-        ))
+        return data
 
-    # Создание фигуры с несколькими ящиками
-    fig = go.Figure(data=box_plots)
 
-    # Настройка осей и заголовков
-    fig.update_layout(
-        title='Обновляющиеся ящики с усами для каждого userID',
-        xaxis_title='Time (ts)',
-        yaxis_title='Values (zs)',
-    )
-    return fig
 
+
+
+
+
+
+dashboard = DashBoard()
 # Запуск приложения
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    dashboard.app.run_server(debug=True)
