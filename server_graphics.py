@@ -2,10 +2,8 @@ import dash
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output
 import plotly.graph_objs as go
-import numpy as np
 from sn_combine import Buffer
 from threading import Thread
-import plotly.express as px
 
 
 class DashBoard(Buffer):
@@ -28,16 +26,12 @@ class DashBoard(Buffer):
             # All elements from the top of the page
             dcc.Store(id='data-store', storage_type='session'),
             html.Div([
-                html.H1(children='Server_graphics SNcoincidence test'),
-
-                html.Div(children='''
-                    Dash: A web application framework for Python.
-                '''),  
+                html.H1(children='Server_graphics SNcoincidence test')
             ]),
 
             html.Div([
-                dcc.Graph(id='box-plots'),  # Один график для всех "ящиков с усами"
-                dcc.Interval(id='interval-component', interval=500, n_intervals=0)  # Обновление каждые 1 сек
+                dcc.Graph(id='box-plots'), 
+                dcc.Interval(id='interval-component', interval=500, n_intervals=0)  # Обновление каждые 0.5 сек
             ]),
 
             html.Div([
