@@ -2,11 +2,11 @@ import dash
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output
 import plotly.graph_objs as go
-from sn_combine import Buffer
 from threading import Thread
+from sn_combine import Buffer
+from snap.datablock import DataBlock
 
-
-class DashBoard(Buffer):
+class DashBuffer(Buffer):
     def __init__(self):
         super().__init__()
         # Инициализация Dash-приложения
@@ -58,7 +58,7 @@ class DashBoard(Buffer):
             Output('box-plots', 'figure'),
             Input('data-store', 'data'),
         )
-        def update_graph(data):
+        def update_graph(data:list[dict]):
             # self.update_data()
             if data == {}:
                 return no_update
@@ -66,12 +66,11 @@ class DashBoard(Buffer):
             # Список для хранения "ящиков с усами" для каждого userID
             box_plots = []
             
-            for userID in data:
-                zs, ts = data[userID]
+            for datablock in data:
                 box_plots.append(go.Scatter(
-                    y=zs,
-                    x=ts,  
-                    name=f'User {userID}',
+                    y=datablock["zs"],
+                    x=datablock["ts"],  
+                    name=f'User {datablock["id"]}',
                     # boxpoints=False,
                     # marker_color=color_list[userID]
                 ))
@@ -88,9 +87,19 @@ class DashBoard(Buffer):
             )
 
             return fig
-        
-    def update_data(self, *args):      
-        return self.get_data()
+
+    
+
+    def update_data(self, *args):
+        def datablock_to_dict(datablock:DataBlock):
+            return {"id": datablock.id,
+                    "zs": datablock.zs,
+                    "ts": datablock.ts
+                    }
+        return list(map(datablock_to_dict, self.get_data()))
+    
+    
+
 
 
 
