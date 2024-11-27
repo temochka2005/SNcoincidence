@@ -1,2 +1,3 @@
 snap_combine
-plotext
+dash
+plotly
