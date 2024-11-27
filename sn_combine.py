@@ -1,5 +1,6 @@
 import numpy as np
 import datetime
+from snap.datablock import DataBlock
 
 async def generator(userID: str, shift = 0.0):
     while(True):
@@ -8,43 +9,18 @@ async def generator(userID: str, shift = 0.0):
         yield {"t":t, "z":z, "userID":userID}
 
 
-class ClientBuffer:
-    def __init__(self):
-        self.clear()
-
-    def put(self, z, t):
-        self.z = np.append(self.z, z)
-        self.t = np.append(self.t, t)
-
-    def clear(self):
-        self.z = np.array([])
-        self.t = np.array([])
-
-    def len(self):
-        return(len(self.z))
-
-    def get(self):
-        if len(self.z) != 0:
-            return self.z, self.t
-        else: 
-            pass
-
 class Buffer:
     def __init__(self):
-        self.clear()
+        self.clients = {}
 
-    async def put(self, data):
-        buf = self.clients.setdefault(data["userID"], ClientBuffer())
-        buf.put(data["z"], data["t"])
-
-    def clear(self):
-        self.clients = dict()
+    async def put(self, data:DataBlock):
+        if data.id in self.clients:
+            self.clients[data.id]+=data
+        else:
+            self.clients[data.id]=data
 
     async def get(self):
         return self.get_data()
     
     def get_data(self):
-        result = dict()
-        for userID in self.clients:
-            result[userID] = self.clients[userID].get()
-        return result
+        return list(self.clients.values())
