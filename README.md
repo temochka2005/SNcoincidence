@@ -11,9 +11,9 @@ pip install -r requirements.txt
 
 #### Clients
 
-Running clients with their username and shift(mean value for normal distribution). 
+Running clients with their detector. 
 ```shell
-USER=user1 shift=5.0 snap_run example.yml
+DETECTOR=detector1 snap_run sn_client.yml
 ```
 It's possible to run several clients in separate terminals.
 
@@ -21,5 +21,5 @@ It's possible to run several clients in separate terminals.
 
 Start server in separate terminal:
 ```shell
-snap_run example.yml -n node_server
+snap_run example.yml
 ```
