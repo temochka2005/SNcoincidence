@@ -21,5 +21,5 @@ It's possible to run several clients in separate terminals.
 
 Start server in separate terminal:
 ```shell
-snap_run example.yml
+snap_run sn_server.yml
 ```
