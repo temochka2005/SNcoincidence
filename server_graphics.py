@@ -43,7 +43,7 @@ class DashBuffer(Buffer):
                 ),
                 dcc.Interval(
                     id='interval-component_ui', 
-                    interval=100,  # Обновление каждые 0.1 сек
+                    interval=500,  # Обновление каждые 0.1 сек
                     n_intervals=0
                 )
             ]),
@@ -76,89 +76,64 @@ class DashBuffer(Buffer):
         )(self.update_data)
 
         @self.app.callback(
-            Output('box-plots', 'figure', allow_duplicate=True),
-            Input('data-store', 'data'),
-            prevent_initial_call=True
+            Output('box-plots', 'figure'),
+            [
+                Input('interval-component_ui', 'n_intervals'),
+                Input('data-store', 'data'),
+                Input('sliding-window-toggle', 'value'),
+            ]
         )
-        def update_graph(data: list[dict]):
-            if data == {}:
-                return no_update
-            
-            # Список для хранения "ящиков" (линий) для каждого userID
-            box_plots = []
-            # current_time = datetime.datetime.now().timestamp()
-            # Преобразуем float-значения времени в datetime и формируем график
+        def update_figure(_, data, toggle_value):
+            """
+            Единый колбэк, который и строит график на основе `data`, 
+            и накладывает "скользящее окно" 48 ч, если checkbox включён
+            """
+            if not data:
+                # Если данных нет, возвращаем no_update или пустую фигуру
+                return dash.no_update
+
+            # 1) Формируем Plotly-график из data
+            traces = []
             for datablock in data:
-                # <-- (Новая секция) преобразуем ts в datetime:
-                x_vals = list(map(datetime.datetime.fromtimestamp, datablock["ts"]))
-                box_plots.append(go.Scatter(
+                # x_vals = list(map(datetime.datetime.fromtimestamp, datablock["ts"]))
+                x_vals = datablock["ts"]
+                traces.append(go.Scatter(
                     x=x_vals,
                     y=datablock["zs"],
                     name=f'User {datablock["id"]}',
                 ))
+            fig = go.Figure(data=traces)
 
-            # Создание фигуры
-            fig = go.Figure(data=box_plots)
-            # Настройка осей и заголовков
-            fig.update_xaxes(
-                tickformat='%Y-%m-%d %H:%M:%S',
-                range=[None, 0],
-                autorange=True  # <-- (Новая строка) формат оси X
-            )
+            # 2) Общие настройки
             fig.update_layout(
-                uirevision='constant',      # <-- (Новая строка) чтобы масштаб не сбрасывался
+                uirevision='constant', 
                 title='Обновляющиеся данные для каждого userID',
                 xaxis_title='Time (ts)',
                 yaxis_title='Values (zs)',
             )
+            
+            # 3) Включаем/выключаем "скользящее окно"
+            if 'ON' in toggle_value:
+                # «Фиксируем» ось X: текущие 48 часов
+                now_ts = datetime.datetime.now().timestamp()
+                tmin = datetime.datetime.fromtimestamp(now_ts - 15)
+                tmax = datetime.datetime.fromtimestamp(now_ts)
+                
+                fig.update_xaxes(
+                    autorange=False,
+                    range=[tmin, tmax],
+                    tickformat='%Y-%m-%d %H:%M:%S'
+                )
+            else:
+                # Возвращаемся к авторесайзу
+                fig.update_xaxes(
+                    autorange=True,
+                    tickformat='%Y-%m-%d %H:%M:%S'
+                )
 
             return fig
 
-        @self.app.callback(
-            [   # Выходы
-                Output('box-plots', 'figure'),
-                Output('last-update', 'data')
-            ],
-            [   # Входы
-                Input('interval-component_ui', 'n_intervals'),
-                Input('sliding-window-toggle', 'value')
-            ],
-            [   # Состояния
-                State('box-plots', 'figure'),
-                State('last-update', 'data')
-            ]
-        )
-        def update_ui(_, toggle_value, figure, last_update):
-            """
-            Колбэк, который раз в 0.1 сек обновляет ось X, если включён режим 
-            "скользящее окно".
-            """
-            current_time = datetime.datetime.now().timestamp()
-            
-            # Если это первое срабатывание -- просто зафиксируем время.
-            if last_update is None:
-                return figure, current_time
-            
-            # Проверяем, включён ли наш переключатель.
-            # Если в toggle_value лежит 'ON', значит пользователь включил "скользящее окно".
-            if 'ON' in toggle_value:
-                # Выключаем autorange:
-                figure['layout']['xaxis']['autorange'] = False
-                
-                # Задаём правую границу как "текущее время", а левую - за 48 ч до него.
-                tmin = datetime.datetime.fromtimestamp(current_time - 15)
-                tmax = datetime.datetime.fromtimestamp(current_time)
-                
-                # Прописываем фиксированный диапазон [tmin, tmax].
-                figure['layout']['xaxis']['range'] = [tmin, tmax]
-            else:
-                # Возвращаемся к режиму авторесайза по X:
-                figure['layout']['xaxis']['autorange'] = True
-                # Удаляем ключ 'range', чтобы plotly не оставлял старое значение.
-                if 'range' in figure['layout']['xaxis']:
-                    del figure['layout']['xaxis']['range']
 
-            return figure, current_time
 
     # <-- (Новая функция) функция, которая удаляет из self.clients данные старше self.drop_tail_hours
     def drop_tail(self):

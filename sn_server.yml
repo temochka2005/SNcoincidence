@@ -4,7 +4,7 @@ config:
 node: !Node
   - !chain
     - !from .io.zmq.recv: {address: *server_address}
-    # - .output.dump: {prefix: "received:"}
+    - .output.dump: {prefix: "received:"}
     # - sn_combine.buffer: {size: 100}
     - server_graphics.DashBuffer: {}
     - .timing.every: {seconds: 5}
