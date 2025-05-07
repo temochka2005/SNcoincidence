@@ -1,5 +1,6 @@
 config:
-    - &server_address "ipc://server.ipc" 
+    - &server_address "ipc://server.ipc"
+    - &combine_address "ipc://combiner.ipc"
 
 node: !Node
   - !chain
@@ -10,5 +11,19 @@ node: !Node
     - .timing.every: {seconds: 5}
     - .tqdm.counter: {desc: 'buffered:'}
     # - .output.dump: {}
-    
-    
+
+combine: !Node
+    - !chain
+        - !from .io.zmq.recv: {address: *combine_address}
+        - .tqdm.counter: {desc: "Data received"}
+        - .output.dump_to_file: {fname: "data_received.dat"}
+        - .io.zmq.send: {address: *server_address}
+        - !to Combine
+
+    - !chain:Combine        
+        - .combine.Buffer: {delay: 5, timeout: 600}
+        - .combine.methods.Fisher
+        - .tqdm.counter: {desc: "Data combined"}
+        - .output.dump_to_file: {fname: "data_combined.dat"}
+        - .io.zmq.send: {address: *server_address}
+

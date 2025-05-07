@@ -11,16 +11,16 @@ node: !Node
         - .client.fake.realtime: {shift: 0}
         # - .output.dump: {prefix: "realtime:"}
         - .tqdm.counter: {desc: "Data"}
-        - !to [CountAna, ShapeAna]
+        - !to [CountAna]
     - !chain:CountAna
         - .client.sigcalc.CountAna: { B: *bg_level, time_window: [0,10], dt: 0.1, tChunk_min: 1}
         - .client.setId: {id: *detector_id}
         - !to Sender
-    - !chain:ShapeAna
-        - .client.sigcalc.ShapeAna: { B: *bg_level, S: *signal1, time_window: [0,10], dt: 0.1, tChunk_min: 1}
-        - .client.setId: {id: "ShapeAna"}
-        - !to Sender
+          #    - !chain:ShapeAna
+          #- .client.sigcalc.ShapeAna: { B: *bg_level, S: *signal1, time_window: [0,10], dt: 0.1, tChunk_min: 1}
+          #- .client.setId: {id: "ShapeAna"}
+          #- !to Sender
         
     - !chain:Sender
         - .tqdm.counter: {desc: "DataBlocks"}
-        - .io.zmq.send: {address: "ipc://server.ipc"}
+        - .io.zmq.send: {address: "ipc://combiner.ipc"}
